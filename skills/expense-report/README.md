@@ -1,6 +1,6 @@
 # Expense Report Skill
 
-**Version:** v1.0.0
+**Version:** v1.0.1
 
 [简体中文文档](./README.zh-CN.md)
 
@@ -125,3 +125,11 @@ python3 /opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/scripts/pac
 ```
 
 Output: `skills/dist/expense-report.skill`
+
+
+## v1.0.1 patch highlights
+
+- Added Discord delivery in `deliver_report.py` (webhook or bot token + channel id).
+- Added category validation in `confirm-category` (rejects invalid categories).
+- Hardened `$` (USD symbol) parsing logic to avoid boundary pitfalls.
+- Added `report --date YYYY-MM-DD` for historical settlement/report generation.

@@ -9,6 +9,7 @@ from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 
 SUPPORTED = {"CNY", "USD", "EUR", "HKD", "JPY", "KRW", "GBP", "SGD"}
+DEFAULT_CATEGORIES = ["餐饮", "居住", "交通出行", "通讯网络", "生活日用", "医疗健康", "运动户外", "服饰美妆", "教育学习", "娱乐休闲", "人情往来", "金融与保险", "订阅会员", "数码产品"]
 ALIASES = {
     "元": "CNY", "块": "CNY", "人民币": "CNY", "rmb": "CNY", "cny": "CNY",
     "美元": "USD", "usd": "USD", "$": "USD",
@@ -113,21 +114,26 @@ def parse_amount_currency(text: str):
         raise ValueError("未识别到金额")
     amount = float(nums[-1])
 
-    # currency detection: longest token first to avoid "美元" being matched by "元"
     cur = "CNY"
     lower = text.lower()
 
-    # 1) explicit currency words/codes first (length-desc)
-    for k in sorted(ALIASES.keys(), key=len, reverse=True):
-        v = ALIASES[k]
-        if re.fullmatch(r"[a-zA-Z$]+", k):
-            if re.search(rf"\b{re.escape(k.lower())}\b", lower):
-                cur = v
-                break
-        else:
-            if k in text:
-                cur = v
-                break
+    # Handle '$' explicitly: word-boundary is unreliable for symbol tokens.
+    if re.search(r"(?:^|\s)\$\s*-?\d| -?\d+(?:\.\d+)?\s*\$", text):
+        cur = "USD"
+    else:
+        # longest token first to avoid "美元" being matched by "元"
+        for k in sorted(ALIASES.keys(), key=len, reverse=True):
+            v = ALIASES[k]
+            if k == "$":
+                continue
+            if re.fullmatch(r"[a-zA-Z]+", k):
+                if re.search(rf"\b{re.escape(k.lower())}\b", lower):
+                    cur = v
+                    break
+            else:
+                if k in text:
+                    cur = v
+                    break
 
     if cur not in SUPPORTED:
         raise ValueError(f"不支持币种: {cur}")
@@ -202,7 +208,7 @@ def cmd_init(args):
     if not cfg.exists():
         cfg.write_text(json.dumps({
             "timezone": "Asia/Shanghai",
-            "categories": ["餐饮", "居住", "交通出行", "通讯网络", "生活日用", "医疗健康", "运动户外", "服饰美妆", "教育学习", "娱乐休闲", "人情往来", "金融与保险", "订阅会员", "数码产品"],
+            "categories": DEFAULT_CATEGORIES,
             "reminderTimes": ["09:30", "14:00", "20:30"],
             "dailySummaryTime": "22:30",
             "largeExpenseThresholdCny": 500,
@@ -247,6 +253,23 @@ def cmd_add(args):
     print(json.dumps(out, ensure_ascii=False))
 
 
+def _valid_categories(root: Path):
+    cfg = load_config(root)
+    cats = cfg.get("categories") if isinstance(cfg, dict) else None
+    if isinstance(cats, list) and cats:
+        return [str(x).strip() for x in cats if str(x).strip()]
+    return DEFAULT_CATEGORIES
+
+
+def _parse_anchor_date(value: str | None):
+    if not value:
+        return dt.date.today()
+    try:
+        return dt.date.fromisoformat(value)
+    except ValueError:
+        raise SystemExit("--date 格式错误，请使用 YYYY-MM-DD")
+
+
 def cmd_confirm_category(args):
     root = Path(args.root)
     ensure(root)
@@ -270,6 +293,10 @@ def cmd_confirm_category(args):
                 break
         if target is None:
             raise SystemExit("no uncategorized entries found")
+
+    valid_categories = _valid_categories(root)
+    if args.category not in valid_categories:
+        raise SystemExit(f"非法分类: {args.category}. 可选: {', '.join(valid_categories)}")
 
     target["category"] = args.category
     save_entries(root, entries)
@@ -398,8 +425,8 @@ def cmd_report(args):
     threshold = float(cfg.get("largeExpenseThresholdCny", 500))
 
     entries = load_entries(root)
-    today = dt.date.today()
-    start, end = period_range(args.period, today)
+    anchor = _parse_anchor_date(args.date)
+    start, end = period_range(args.period, anchor)
 
     rates_obj = {}
     rp = root / "fx-rates.json"
@@ -510,6 +537,7 @@ def main():
     p_report = sub.add_parser("report")
     p_report.add_argument("--root", required=True)
     p_report.add_argument("--period", choices=["daily", "weekly", "monthly", "yearly"], required=True)
+    p_report.add_argument("--date", help="anchor date for report period (YYYY-MM-DD), default=today")
     p_report.set_defaults(func=cmd_report)
 
     args = p.parse_args()

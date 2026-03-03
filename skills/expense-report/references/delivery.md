@@ -25,3 +25,29 @@ Use `--dry-run` first to verify attachment selection without actually sending.
 
 Send the generated report file to a channel via OpenClaw message tool from agent workflow.
 Target format: `channel:<id>`.
+
+
+## Discord delivery (runnable)
+
+Via bot token + channel id:
+
+```bash
+python3 skills/expense-report/scripts/deliver_report.py \
+  --root shared/expense-report \
+  --period daily \
+  --format html \
+  --discord-bot-token <BOT_TOKEN> \
+  --discord-channel-id <CHANNEL_ID>
+```
+
+Via incoming webhook URL:
+
+```bash
+python3 skills/expense-report/scripts/deliver_report.py \
+  --root shared/expense-report \
+  --period daily \
+  --format html \
+  --discord-webhook-url <WEBHOOK_URL>
+```
+
+You can combine email + Discord in one run.

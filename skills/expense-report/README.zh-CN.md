@@ -1,6 +1,6 @@
 # Expense Report（支出统计）Skill
 
-**版本号：** v1.0.0
+**版本号：** v1.0.1
 
 [一页版说明（面向非技术用户）](./README.zh-CN.onepage.md)
 
@@ -139,3 +139,11 @@ python3 /opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/scripts/pac
 输出文件：
 
 - `skills/dist/expense-report.skill`
+
+
+## v1.0.1 补丁更新
+
+- `deliver_report.py` 新增 Discord 投递闭环（Webhook 或 Bot Token + Channel ID）。
+- `confirm-category` 新增分类合法性校验（拒绝写入非法分类）。
+- 优化 `$`（美元符号）识别逻辑，规避边界匹配问题。
+- `report` 新增 `--date YYYY-MM-DD`，支持历史日期结算报表。
