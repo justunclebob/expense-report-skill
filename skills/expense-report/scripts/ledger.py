@@ -9,7 +9,7 @@ from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 
 SUPPORTED = {"CNY", "USD", "EUR", "HKD", "JPY", "KRW", "GBP", "SGD"}
-DEFAULT_CATEGORIES = ["餐饮", "居住", "交通出行", "通讯网络", "生活日用", "医疗健康", "运动户外", "服饰美妆", "教育学习", "娱乐休闲", "人情往来", "金融与保险", "订阅会员", "数码产品"]
+DEFAULT_CATEGORIES = ["餐饮", "居住", "交通出行", "通讯网络", "生活日用", "医疗健康", "运动户外", "服饰美妆", "教育学习", "娱乐休闲", "人情往来", "金融与保险", "订阅会员", "数码产品", "退款与冲减"]
 ALIASES = {
     "元": "CNY", "块": "CNY", "人民币": "CNY", "rmb": "CNY", "cny": "CNY",
     "美元": "USD", "usd": "USD", "$": "USD",
@@ -109,7 +109,7 @@ def parse_date(text: str, today: dt.date):
 
 
 def parse_amount_currency(text: str):
-    nums = re.findall(r"(-?\d+(?:\.\d+)?)", text)
+    nums = re.findall(r"(-?(?:\d+(?:\.\d+)?|\.\d+))", text)
     if not nums:
         raise ValueError("未识别到金额")
     amount = float(nums[-1])
@@ -145,7 +145,7 @@ def parse_note(text: str):
     t = re.sub(r"\d{4}-\d{1,2}-\d{1,2}", "", t)
     t = re.sub(r"\d{1,2}月\d{1,2}日", "", t)
     t = re.sub(r"昨天|前天", "", t)
-    t = re.sub(r"-?\d+(?:\.\d+)?", "", t)
+    t = re.sub(r"-?(?:\d+(?:\.\d+)?|\.\d+)", "", t)
     # remove currency words/symbols case-insensitively
     t = re.sub(r"\b(cny|rmb|usd|eur|hkd|jpy|krw|gbp|sgd)\b", "", t, flags=re.IGNORECASE)
     for k in sorted(ALIASES.keys(), key=len, reverse=True):
@@ -224,10 +224,18 @@ def cmd_add(args):
     today = dt.date.today()
     text = args.text.strip()
     d = parse_date(text, today)
-    amount, cur = parse_amount_currency(text)
+    try:
+        amount, cur = parse_amount_currency(text)
+    except ValueError as e:
+        raise SystemExit(f"{e}。请按“午饭 32”或“咖啡 USD 4.5”格式输入")
     note = parse_note(text)
     custom_keywords = load_custom_keywords(root)
-    category = infer_category(text, note, custom_keywords=custom_keywords)
+    lower_text = text.lower()
+    is_refund = any(k in text for k in ["退款", "报销", "返现", "退货"]) or (amount < 0)
+    if is_refund:
+        category = "退款与冲减"
+    else:
+        category = infer_category(text, note, custom_keywords=custom_keywords)
     item = {
         "id": f"{d.strftime('%Y%m%d')}-{uuid.uuid4().hex[:8]}",
         "occurredAt": d.isoformat(),
@@ -238,11 +246,12 @@ def cmd_add(args):
         "category": category,
         "note": note,
         "sourceText": text,
+        "isRefund": is_refund,
     }
     save_entry(root, item)
 
     out = {"entry": item}
-    if category == "待分类":
+    if category == "待分类" and not is_refund:
         options = suggest_categories(text, note, topn=3)
         out["needsCategoryConfirmation"] = True
         out["categorySuggestions"] = options
