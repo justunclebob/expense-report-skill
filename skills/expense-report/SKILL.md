@@ -17,11 +17,9 @@ Canonical storage root (workspace-relative): `shared/expense-report/`
 
 ## Standard categories (default 15)
 
-餐饮、居住、交通出行、通讯网络、生活日用、医疗健康、运动户外、服饰美妆、教育学习、娱乐休闲、人情往来、金融与保险、订阅会员、数码产品
+餐饮、居住、交通出行、通讯网络、生活日用、医疗健康、运动户外、服饰美妆、教育学习、娱乐休闲、人情往来、金融与保险、订阅会员、数码产品、退款与冲减
 
 During setup, ask whether to keep all defaults or provide custom adds/removes.
-
-当前默认分类包含：退款与冲减（共15类）。
 
 ## Workflow
 
