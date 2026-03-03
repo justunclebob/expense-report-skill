@@ -1,6 +1,6 @@
 # Expense Report Skill
 
-**Version:** v1.0.1
+**Version:** v1.0.2
 
 [简体中文文档](./README.zh-CN.md)
 
