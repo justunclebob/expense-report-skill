@@ -91,6 +91,25 @@ python3 skills/expense-report/scripts/deliver_report.py \
 
 Tip: run with `--dry-run` first.
 
+### Discord delivery
+
+```bash
+# via webhook
+python3 skills/expense-report/scripts/deliver_report.py \
+  --root shared/expense-report \
+  --period daily \
+  --format html \
+  --discord-webhook-url <WEBHOOK_URL>
+
+# via bot token + channel id
+python3 skills/expense-report/scripts/deliver_report.py \
+  --root shared/expense-report \
+  --period daily \
+  --format html \
+  --discord-bot-token <BOT_TOKEN> \
+  --discord-channel-id <CHANNEL_ID>
+```
+
 ## Notes
 
 - FX conversion happens at **report time** (not entry time).
@@ -126,6 +145,13 @@ python3 /opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/scripts/pac
 
 Output: `skills/dist/expense-report.skill`
 
+
+## v1.0.2 patch highlights
+
+- Friendly validation message when amount is missing (no traceback).
+- Correct decimal parsing for inputs like `.5` (now parsed as `0.5`).
+- Refund semantics: `退款/报销/返现/退货` or negative amounts are classified as `退款与冲减`.
+- Minor note-cleaning fix for decimal-format inputs.
 
 ## v1.0.1 patch highlights
 

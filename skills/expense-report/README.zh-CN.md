@@ -64,7 +64,7 @@ python3 skills/expense-report/scripts/ledger.py rates --root shared/expense-repo
 python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period daily
 ```
 
-## 邮件发送（可执行）
+## 报告投递（可执行）
 
 ```bash
 python3 skills/expense-report/scripts/deliver_report.py \
@@ -80,6 +80,25 @@ python3 skills/expense-report/scripts/deliver_report.py \
 ```
 
 建议先加 `--dry-run` 进行演练。
+
+### Discord 投递
+
+```bash
+# Webhook 方式
+python3 skills/expense-report/scripts/deliver_report.py \
+  --root shared/expense-report \
+  --period daily \
+  --format html \
+  --discord-webhook-url <WEBHOOK_URL>
+
+# Bot Token + 频道 ID 方式
+python3 skills/expense-report/scripts/deliver_report.py \
+  --root shared/expense-report \
+  --period daily \
+  --format html \
+  --discord-bot-token <BOT_TOKEN> \
+  --discord-channel-id <CHANNEL_ID>
+```
 
 ## 数据流程
 
@@ -140,6 +159,13 @@ python3 /opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/scripts/pac
 
 - `skills/dist/expense-report.skill`
 
+
+## v1.0.2 补丁更新
+
+- 无金额输入返回友好提示（不再抛 traceback）。
+- 修复 `.5` 小数写法解析（现在会正确记为 `0.5`）。
+- 增加退款语义：`退款/报销/返现/退货` 或负数金额会归类到 `退款与冲减`。
+- 修复小数输入场景下的备注清洗细节。
 
 ## v1.0.1 补丁更新
 
