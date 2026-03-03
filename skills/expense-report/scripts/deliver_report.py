@@ -185,6 +185,9 @@ def main():
         send_discord_via_bot(bot_token, channel_id, args.discord_message, target, dry_run=args.dry_run)
 
     if not recipients and not webhook_url and not (bot_token and channel_id):
+        if args.dry_run:
+            print(f"[dry-run] no delivery target configured; validated report file only: {target}")
+            return
         raise SystemExit("no delivery target configured: provide email recipients and/or discord target")
 
 

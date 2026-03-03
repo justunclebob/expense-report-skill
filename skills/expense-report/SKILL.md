@@ -15,11 +15,13 @@ Canonical storage root (workspace-relative): `shared/expense-report/`
 - `entries.jsonl` - normalized expense rows (append-only)
 - `reports/` - generated JSON/HTML/PDF reports
 
-## Standard categories (default 14)
+## Standard categories (default 15)
 
 餐饮、居住、交通出行、通讯网络、生活日用、医疗健康、运动户外、服饰美妆、教育学习、娱乐休闲、人情往来、金融与保险、订阅会员、数码产品
 
 During setup, ask whether to keep all defaults or provide custom adds/removes.
+
+当前默认分类包含：退款与冲减（共15类）。
 
 ## Workflow
 
@@ -31,7 +33,7 @@ Collect and save to `shared/expense-report/config.json`:
 - reminder times per day (e.g. `09:30, 14:00, 20:30`)
 - daily summary time (e.g. `22:30`)
 - weekly/monthly/yearly summary schedule (default week end / month end / year end)
-- categories (default 14 + optional edits)
+- categories (default 15 + optional edits)
 - discord report target (`channel:<id>`)
 - email recipients (optional list)
 - large-expense threshold CNY (default 500)

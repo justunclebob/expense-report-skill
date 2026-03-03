@@ -79,7 +79,7 @@ python3 skills/expense-report/scripts/deliver_report.py \
   --to a@example.com,b@example.com
 ```
 
-建议先加 `--dry-run` 进行演练。
+建议先加 `--dry-run` 进行演练。`dry-run` 模式下允许不配置投递目标，仅验证报告文件可用性。
 
 ### Discord 投递
 

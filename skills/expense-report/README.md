@@ -89,7 +89,7 @@ python3 skills/expense-report/scripts/deliver_report.py \
   --to a@example.com,b@example.com
 ```
 
-Tip: run with `--dry-run` first.
+Tip: run with `--dry-run` first. In dry-run mode, no delivery target is required; it will validate report-file readiness only.
 
 ### Discord delivery
 
