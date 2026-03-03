@@ -1,0 +1,127 @@
+# Expense Report Skill
+
+**Version:** v1.0.0
+
+[简体中文文档](./README.zh-CN.md)
+
+OpenClaw skill for local-first personal expense tracking with proactive reminders, natural-language entry parsing, multi-currency support, and periodic reports.
+
+## Features
+
+- **Natural-language bookkeeping**
+  - Examples: `午饭 32元`, `咖啡 USD 4.5`, `补录 3月1日 打车 45`
+- **Smarter classification UX**
+  - If an entry is uncategorized (`待分类`), the tool returns top-3 category suggestions.
+  - You can confirm + learn category mapping so similar entries auto-classify next time.
+- **Safer currency parsing**
+  - Longest-token-first detection avoids mis-parsing cases like `美元` being matched as `元`.
+- **FX reliability fallback**
+  - Uses primary + backup FX APIs, and falls back to local cached rates if live fetch fails.
+  - Report output includes `fxMeta` (`updatedAt`, `source`, `stale`) for transparency.
+- **Local storage (editable, portable)**
+  - `shared/expense-report/config.json`
+  - `shared/expense-report/entries.jsonl`
+  - `shared/expense-report/reports/`
+- **Periodic reporting**
+  - Daily / Weekly / Monthly / Yearly
+  - JSON + HTML output (PDF can be rendered from HTML)
+- **Multi-currency support**
+  - CNY, USD, EUR, HKD, JPY, KRW, GBP, SGD
+  - Unified CNY output at report generation time
+
+## Directory Structure
+
+```text
+expense-report/
+├── SKILL.md
+├── scripts/
+│   └── ledger.py
+└── references/
+    ├── category-rules.md
+    └── data-contract.md
+```
+
+Runtime data:
+
+```text
+shared/expense-report/
+├── config.json
+├── entries.jsonl
+├── fx-rates.json
+└── reports/
+    ├── daily/
+    ├── weekly/
+    ├── monthly/
+    └── yearly/
+```
+
+## Quick Start
+
+From workspace root:
+
+```bash
+python3 skills/expense-report/scripts/ledger.py init --root shared/expense-report
+python3 skills/expense-report/scripts/ledger.py add --root shared/expense-report --text "补录 3月1日 午饭 32元"
+python3 skills/expense-report/scripts/ledger.py rates --root shared/expense-report
+python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period daily
+```
+
+## Report Delivery (runnable)
+
+Use OpenClaw cron + scripts to:
+
+- send reminders multiple times per day,
+- generate reports at configured times,
+- deliver report files to Discord and email.
+
+### Email (SMTP)
+
+```bash
+python3 skills/expense-report/scripts/deliver_report.py \
+  --root shared/expense-report \
+  --period daily \
+  --format html \
+  --smtp-host smtp.qq.com \
+  --smtp-port 465 \
+  --smtp-user your_account@qq.com \
+  --smtp-pass YOUR_SMTP_AUTH_CODE \
+  --from your_account@qq.com \
+  --to a@example.com,b@example.com
+```
+
+Tip: run with `--dry-run` first.
+
+## Notes
+
+- FX conversion happens at **report time** (not entry time).
+- If category cannot be inferred, mark as `待分类` and return top-3 suggestions.
+- Use `confirm-category --learn` to persist a keyword-category mapping for future auto-classification.
+- For destructive edits (deleting historical entries), require explicit confirmation.
+
+## Uncategorized confirmation & learning
+
+```bash
+# confirm latest uncategorized entry and learn keyword from note
+python3 skills/expense-report/scripts/ledger.py confirm-category \
+  --root shared/expense-report \
+  --category 生活日用 \
+  --learn
+
+# or specify entry id
+python3 skills/expense-report/scripts/ledger.py confirm-category \
+  --root shared/expense-report \
+  --entry-id 20260303-abc12345 \
+  --category 生活日用 \
+  --learn \
+  --keyword 宠物零食
+```
+
+## Packaging
+
+```bash
+python3 /opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/scripts/package_skill.py \
+  skills/expense-report \
+  skills/dist
+```
+
+Output: `skills/dist/expense-report.skill`
