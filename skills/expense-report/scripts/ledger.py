@@ -8,6 +8,22 @@ from pathlib import Path
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 
+
+def resolve_root(root_arg: str) -> Path:
+    """Resolve storage root in a portable, single-workspace-safe way.
+
+    Key rule: relative roots are resolved against the *workspace that owns this
+    skill file*, not against current working directory. This prevents split data
+    when the script is launched from different folders.
+    """
+    p = Path(root_arg).expanduser()
+    if p.is_absolute():
+        return p.resolve(strict=False)
+
+    # scripts/ledger.py -> skills/expense-report/scripts -> workspace root = parents[3]
+    workspace_root = Path(__file__).resolve().parents[3]
+    return (workspace_root / p).resolve(strict=False)
+
 SUPPORTED = {"CNY", "USD", "EUR", "HKD", "JPY", "KRW", "GBP", "SGD"}
 DEFAULT_CATEGORIES = ["餐饮", "居住", "交通出行", "通讯网络", "生活日用", "医疗健康", "运动户外", "服饰美妆", "教育学习", "娱乐休闲", "人情往来", "金融与保险", "订阅会员", "数码产品", "退款与冲减"]
 ALIASES = {
@@ -202,7 +218,7 @@ def suggest_categories(text: str, note: str, topn: int = 3):
 
 
 def cmd_init(args):
-    root = Path(args.root)
+    root = resolve_root(args.root)
     ensure(root)
     cfg = root / "config.json"
     if not cfg.exists():
@@ -219,7 +235,7 @@ def cmd_init(args):
 
 
 def cmd_add(args):
-    root = Path(args.root)
+    root = resolve_root(args.root)
     ensure(root)
     today = dt.date.today()
     text = args.text.strip()
@@ -280,7 +296,7 @@ def _parse_anchor_date(value: str | None):
 
 
 def cmd_confirm_category(args):
-    root = Path(args.root)
+    root = resolve_root(args.root)
     ensure(root)
 
     entries = load_entries(root)
@@ -329,7 +345,7 @@ def cmd_confirm_category(args):
 
 
 def cmd_rates(args):
-    root = Path(args.root)
+    root = resolve_root(args.root)
     ensure(root)
 
     sources = [
@@ -428,7 +444,7 @@ def _rows_in_range(entries, start: dt.date, end: dt.date, rates):
 
 
 def cmd_report(args):
-    root = Path(args.root)
+    root = resolve_root(args.root)
     ensure(root)
     cfg = load_config(root)
     threshold = float(cfg.get("largeExpenseThresholdCny", 500))

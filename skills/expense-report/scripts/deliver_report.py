@@ -9,6 +9,14 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 
+def resolve_root(root_arg: str) -> Path:
+    p = Path(root_arg).expanduser()
+    if p.is_absolute():
+        return p.resolve(strict=False)
+    workspace_root = Path(__file__).resolve().parents[3]
+    return (workspace_root / p).resolve(strict=False)
+
+
 def latest_file(report_dir: Path, suffix: str):
     files = sorted(report_dir.glob(f"*{suffix}"))
     return files[-1] if files else None
@@ -133,7 +141,7 @@ def main():
 
     args = p.parse_args()
 
-    root = Path(args.root)
+    root = resolve_root(args.root)
     report_dir = root / "reports" / args.period
     if not report_dir.exists():
         raise SystemExit(f"report dir not found: {report_dir}")

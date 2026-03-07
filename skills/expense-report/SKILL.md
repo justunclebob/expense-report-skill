@@ -106,7 +106,7 @@ If PDF toolchain unavailable, send JSON + concise markdown summary and state fal
 
 ## Commands / script usage
 
-Run from workspace root:
+Run from workspace root (or any directory; scripts now resolve relative `--root` against the skill's workspace to avoid split data paths):
 
 ```bash
 python3 skills/expense-report/scripts/ledger.py init --root shared/expense-report
