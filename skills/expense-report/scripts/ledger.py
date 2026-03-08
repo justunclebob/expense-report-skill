@@ -2,6 +2,7 @@
 import argparse
 import datetime as dt
 import json
+import math
 import re
 import uuid
 from pathlib import Path
@@ -443,6 +444,125 @@ def _rows_in_range(entries, start: dt.date, end: dt.date, rates):
     return rows
 
 
+def _period_labels(period: str):
+    period_label = {"daily": "日报", "weekly": "周报", "monthly": "月报", "yearly": "年报"}.get(period, period)
+    period_compare_label = {
+        "daily": "较昨日变化",
+        "weekly": "较上周变化",
+        "monthly": "较上月变化",
+        "yearly": "较上年变化",
+    }.get(period, "较上期变化")
+    return period_label, period_compare_label
+
+
+def _build_category_svg(by_category: dict, total: float) -> str:
+    cat_items = list(by_category.items())
+    palette = ["#6366F1", "#22D3EE", "#34D399", "#FBBF24", "#FB7185", "#A78BFA", "#A3E635", "#FB923C", "#2DD4BF", "#F472B6"]
+
+    def _polar(cx, cy, r, ang):
+        return cx + r * math.cos(ang), cy + r * math.sin(ang)
+
+    cx, cy, r = 420.0, 185.0, 120.0
+    svg_parts = [
+        "<svg class='cat-svg' viewBox='0 0 980 420' width='100%' height='420' role='img' aria-label='分类占比饼图'>",
+        f"<circle cx='{cx:.1f}' cy='{cy:.1f}' r='{r:.1f}' fill='#eef2ff'/>",
+    ]
+
+    label_points = []
+    acc = 0.0
+    for i, (k, v) in enumerate(cat_items):
+        pct = (v / total * 100) if total > 0 else 0.0
+        if pct <= 0:
+            continue
+        color = palette[i % len(palette)]
+
+        a0 = math.radians(acc * 3.6 - 90)
+        a1 = math.radians((acc + pct) * 3.6 - 90)
+        x0, y0 = _polar(cx, cy, r, a0)
+        x1, y1 = _polar(cx, cy, r, a1)
+        large_arc = 1 if pct > 50 else 0
+        d = f"M {cx:.2f} {cy:.2f} L {x0:.2f} {y0:.2f} A {r:.2f} {r:.2f} 0 {large_arc} 1 {x1:.2f} {y1:.2f} Z"
+        svg_parts.append(f"<path d='{d}' fill='{color}'/>")
+
+        mid = math.radians((acc + pct / 2.0) * 3.6 - 90)
+        sx, sy = _polar(cx, cy, r + 2, mid)
+        ex, ey = _polar(cx, cy, r + 55, mid)
+        side = "right" if math.cos(mid) >= 0 else "left"
+        label_points.append({"sx": sx, "sy": sy, "ex": ex, "ey": ey, "side": side, "text": f"{k}: {v:.2f} ({pct:.1f}%)", "color": color})
+
+        if pct >= 6.0:
+            px, py = _polar(cx, cy, r * 0.76, mid)
+            svg_parts.append(
+                f"<text x='{px:.2f}' y='{py:.2f}' text-anchor='middle' dominant-baseline='middle' font-size='12' font-weight='700' fill='#1f2937'>{pct:.1f}%</text>"
+            )
+
+        acc += pct
+
+    def _spread(points, min_y=30.0, max_y=340.0, gap=20.0):
+        points.sort(key=lambda t: t["ey"])
+        y = min_y
+        for pp in points:
+            if pp["ey"] < y:
+                pp["ey"] = y
+            y = pp["ey"] + gap
+        if points and points[-1]["ey"] > max_y:
+            shift = points[-1]["ey"] - max_y
+            for pp in points:
+                pp["ey"] -= shift
+
+    left = [pp for pp in label_points if pp["side"] == "left"]
+    right = [pp for pp in label_points if pp["side"] == "right"]
+    _spread(left)
+    _spread(right)
+
+    for pp in left + right:
+        svg_parts.append(f"<line x1='{pp['sx']:.2f}' y1='{pp['sy']:.2f}' x2='{pp['ex']:.2f}' y2='{pp['ey']:.2f}' stroke='{pp['color']}' stroke-width='1.6' opacity='0.95'/>")
+        svg_parts.append(f"<circle cx='{pp['ex']:.2f}' cy='{pp['ey']:.2f}' r='4.0' fill='{pp['color']}'/>")
+        if pp['side'] == 'right':
+            tx, anchor = pp['ex'] + 8, 'start'
+        else:
+            tx, anchor = pp['ex'] - 8, 'end'
+        svg_parts.append(f"<text x='{tx:.2f}' y='{pp['ey']+4:.2f}' text-anchor='{anchor}' font-size='14' fill='#111827'>{pp['text']}</text>")
+
+    svg_parts.append("</svg>")
+    return "".join(svg_parts)
+
+
+def _build_report_html(out: dict, period_label: str, period_compare_label: str, cat_svg: str, large: list) -> str:
+    start = out['range']['start']
+    end = out['range']['end']
+    lines = [
+        "<!doctype html>",
+        "<html lang='zh-CN'>",
+        "<head>",
+        "<meta charset='utf-8'>",
+        "<meta name='viewport' content='width=device-width, initial-scale=1'>",
+        "<title>支出报告</title>",
+        "<style>body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',Arial,sans-serif;line-height:1.6;padding:20px;margin:0;color:#111827;background:#fafafa;display:flex;justify-content:center;} .page{width:min(980px,100%);text-align:center;} h1,h2{margin:10px 0;} p{margin:8px 0;} .cat-svg{display:block;max-width:820px;height:auto;margin:0 auto;} ul,ol{display:inline-block;text-align:left;padding-left:24px;} li{margin:4px 0;}</style>",
+        "</head><body><div class='page'>",
+        f"<h1>支出{period_label}</h1>",
+        f"<p>统计区间：{start} ~ {end}</p>",
+        f"<p>总支出（CNY）：<b>{out['totalCny']}</b>｜记录数：{out['count']}</p>",
+        f"<p>{period_compare_label}：{out['trendVsPrevious']['deltaCny']:+.2f} CNY"
+        + ("" if out['trendVsPrevious']['deltaPct'] is None else f" ({out['trendVsPrevious']['deltaPct']:+.2f}%)")
+        + "</p>",
+        f"<p style='color:#4b5563;font-size:14px;'>对比区间：{out['trendVsPrevious']['previousRange']['start']} ~ {out['trendVsPrevious']['previousRange']['end']}</p>",
+        "<h2>分类占比</h2>",
+        cat_svg,
+        "<h2>大额支出（>500 CNY）</h2>", "<ul>"]
+    if large:
+        for x in large:
+            lines.append(f"<li>{x['occurredAt']} | {x['note']} | {x['amount']} {x['currency']} (~{(x.get('amountCny') or 0):.2f} CNY)</li>")
+    else:
+        lines.append("<li>无</li>")
+    lines.extend(["</ul>", "<h2>支出明细 Top 10</h2>", "<ol>"])
+    for x in out["topExpenses"]:
+        lines.append(f"<li>{x['occurredAt']} | {x['note']} | {x['amount']} {x['currency']} (~{(x.get('amountCny') or 0):.2f} CNY)</li>")
+    lines.append("</ol>")
+    lines.append("</div></body></html>")
+    return "\n".join(lines)
+
+
 def cmd_report(args):
     root = resolve_root(args.root)
     ensure(root)
@@ -506,30 +626,9 @@ def cmd_report(args):
     base = root / "reports" / args.period / stamp
     (base.with_suffix(".json")).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    lines = [
-        f"<h1>Expense Report ({args.period})</h1>",
-        f"<p>Range: {start} ~ {end}</p>",
-        f"<p>Total (CNY): <b>{out['totalCny']}</b> | Count: {out['count']}</p>",
-        f"<p>Trend vs previous: {out['trendVsPrevious']['deltaCny']:+.2f} CNY"
-        + ("" if out['trendVsPrevious']['deltaPct'] is None else f" ({out['trendVsPrevious']['deltaPct']:+.2f}%)")
-        + "</p>",
-        "<h2>By Category</h2>",
-        "<ul>",
-    ]
-    for k, v in out["byCategory"].items():
-        pct = (v / total * 100) if total > 0 else 0
-        lines.append(f"<li>{k}: {v:.2f} ({pct:.1f}%)</li>")
-    lines.extend(["</ul>", "<h2>Large Expenses</h2>", "<ul>"])
-    if large:
-        for x in large:
-            lines.append(f"<li>{x['occurredAt']} | {x['note']} | {x['amount']} {x['currency']} (~{(x.get('amountCny') or 0):.2f} CNY)</li>")
-    else:
-        lines.append("<li>None</li>")
-    lines.extend(["</ul>", "<h2>Top Expenses</h2>", "<ol>"])
-    for x in out["topExpenses"]:
-        lines.append(f"<li>{x['occurredAt']} | {x['note']} | {x['amount']} {x['currency']} (~{(x.get('amountCny') or 0):.2f} CNY)</li>")
-    lines.append("</ol>")
-    html = "\n".join(lines)
+    period_label, period_compare_label = _period_labels(args.period)
+    cat_svg = _build_category_svg(out["byCategory"], total)
+    html = _build_report_html(out, period_label, period_compare_label, cat_svg, large)
     (base.with_suffix(".html")).write_text(html, encoding="utf-8")
     print(json.dumps({"json": str(base.with_suffix('.json')), "html": str(base.with_suffix('.html'))}, ensure_ascii=False))
 

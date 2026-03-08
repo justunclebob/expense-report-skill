@@ -25,6 +25,10 @@ OpenClaw skill for local-first personal expense tracking with proactive reminder
 - **Periodic reporting**
   - Daily / Weekly / Monthly / Yearly
   - JSON + HTML output (PDF can be rendered from HTML)
+- **Visual report template (Weekly/Monthly/Yearly)**
+  - Unified Chinese layout for weekly, monthly, yearly reports
+  - Includes summary block, pie chart with straight leader lines, large-expense block, and Top 10 list
+  - Daily report stays text-first (no screenshot required)
 - **Multi-currency support**
   - CNY, USD, EUR, HKD, JPY, KRW, GBP, SGD
   - Unified CNY output at report generation time
@@ -64,6 +68,29 @@ python3 skills/expense-report/scripts/ledger.py init --root shared/expense-repor
 python3 skills/expense-report/scripts/ledger.py add --root shared/expense-report --text "补录 3月1日 午饭 32元"
 python3 skills/expense-report/scripts/ledger.py rates --root shared/expense-report
 python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period daily
+```
+
+## Visual Report (Weekly / Monthly / Yearly)
+
+Current visual template is unified across weekly/monthly/yearly:
+
+- Header summary: date range, total CNY, count, period-over-period delta, comparison range
+- Category share: pie chart with external straight-line labels
+- Large expenses: `>500 CNY`
+- Top 10 expenses list
+
+Period comparison labels:
+
+- Weekly: vs previous week
+- Monthly: vs previous month
+- Yearly: vs previous year
+
+Generation examples:
+
+```bash
+python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period weekly
+python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period monthly
+python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period yearly
 ```
 
 ## Report Delivery (runnable)
@@ -109,6 +136,13 @@ python3 skills/expense-report/scripts/deliver_report.py \
   --discord-bot-token <BOT_TOKEN> \
   --discord-channel-id <CHANNEL_ID>
 ```
+
+## Scheduled behavior (current)
+
+- Daily report: send daily, text summary only (no screenshot)
+- Weekly report: visual template + report path + screenshot
+- Monthly report: only on month-end; silent skip on non-month-end days
+- Yearly report: only on year-end; silent skip on non-year-end days
 
 ## Notes
 

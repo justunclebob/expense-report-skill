@@ -26,6 +26,10 @@
 - 定期报告
   - 日报 / 周报 / 月报 / 年报
   - 输出 JSON + HTML（可进一步渲染 PDF）
+- 可视化报告（周/月/年）
+  - 周报、月报、年报使用统一中文排版模板
+  - 包含：总支出、对比区间、分类占比饼图（扇区直线标注）、大额支出、Top10 明细
+  - 日报默认仅文字摘要（不做可视化截图）
 
 ## 目录结构
 
@@ -64,6 +68,29 @@ python3 skills/expense-report/scripts/ledger.py rates --root shared/expense-repo
 python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period daily
 ```
 
+## 可视化报告说明（周/月/年）
+
+当前模板（周报、月报、年报）统一为：
+
+- 顶部摘要：统计区间、总支出、记录数、较上期变化、对比区间
+- 分类占比：饼图 + 扇区外侧直线标注（中文图例）
+- 大额支出：`>500 CNY`
+- 支出明细 Top 10
+
+周期口径：
+
+- 周报：较上周变化
+- 月报：较上月变化
+- 年报：较上年变化
+
+示例生成命令：
+
+```bash
+python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period weekly
+python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period monthly
+python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period yearly
+```
+
 ## 报告投递（可执行）
 
 ```bash
@@ -99,6 +126,13 @@ python3 skills/expense-report/scripts/deliver_report.py \
   --discord-bot-token <BOT_TOKEN> \
   --discord-channel-id <CHANNEL_ID>
 ```
+
+## 定时任务约定（当前）
+
+- 日报：每日发送，文字摘要为主（不强制截图）
+- 周报：每周日发送，可视化模板 + 报告路径 + 截图
+- 月报：仅月末发送；非月末静默跳过（不提示“已跳过”）
+- 年报：仅年末发送；非年末静默跳过（不提示“已跳过”）
 
 ## 数据流程
 
