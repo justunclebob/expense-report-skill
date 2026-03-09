@@ -1,6 +1,6 @@
 # Expense Report（支出统计）Skill
 
-**版本号：** v1.0.2
+**版本号：** v1.1.0
 
 [一页版说明（面向非技术用户）](./README.zh-CN.onepage.md)
 
