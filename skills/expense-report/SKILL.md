@@ -9,7 +9,7 @@ description: Personal expense bookkeeping with proactive reminder setup, natural
 
 Use this skill to run a local-first bookkeeping flow inside OpenClaw: remind user to记账, ingest short text entries, store normalized records locally, and generate periodic reports in CNY.
 
-Canonical storage root (workspace-relative): `shared/expense-report/`
+Canonical storage root (workspace-relative to `workspace-expense`): `shared/expense-report/`
 
 - `config.json` - user settings (reminders, categories, delivery targets)
 - `entries.jsonl` - normalized expense rows (append-only)
@@ -90,6 +90,15 @@ Use `scripts/ledger.py report` for `daily|weekly|monthly|yearly`:
 - large-expense alerts (>= threshold)
 - trend comparison vs previous period (if data exists)
 
+Behavior contract (important):
+
+- `daily`: text-first summary is acceptable; screenshot is not required by default.
+- `weekly`, `monthly`, `yearly`: these are **default visual reports**, not optional enhancements.
+  - Prefer `scripts/render_visual_report.py` as the stable entrypoint
+  - Must use the Chinese visual template already implemented in this skill
+  - Must produce/send a screenshot when the task asks to send the report to a channel
+  - Do **not** downgrade to plain text unless the user explicitly allows fallback or the render step fails
+
 Outputs:
 
 - JSON: `shared/expense-report/reports/<period>/<stamp>.json`
@@ -101,6 +110,13 @@ Generate PDF from HTML (preferred) and deliver:
 
 - Post PDF to Discord report channel
 - Send via email if recipients configured
+
+For channel delivery of weekly/monthly/yearly visual reports:
+
+- Prefer `scripts/capture_visual_report.py` to prepare the HTML for capture
+- Never screenshot `file://...` directly; serve the HTML over local HTTP first
+- Verify the page is actually rendered (title + chart present) before sending
+- If render/screenshot fails, stop and report the error instead of sending a blank image
 
 If PDF toolchain unavailable, send JSON + concise markdown summary and state fallback clearly.
 

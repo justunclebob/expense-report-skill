@@ -528,7 +528,69 @@ def _build_category_svg(by_category: dict, total: float) -> str:
     return "".join(svg_parts)
 
 
-def _build_report_html(out: dict, period_label: str, period_compare_label: str, cat_svg: str, large: list) -> str:
+def _build_trend_svg(period: str, rows: list, start: dt.date, end: dt.date) -> tuple[str, str]:
+    if period in ("weekly", "monthly"):
+        labels = []
+        day = start
+        while day <= end:
+            labels.append(day)
+            day += dt.timedelta(days=1)
+        title = "消费走势（日）"
+        if period == "monthly":
+            xlabels = [str(d.day) for d in labels]
+        else:
+            xlabels = [d.strftime("%m-%d") for d in labels]
+        values = []
+        for d in labels:
+            values.append(round(sum((r.get("amountCny") or 0) for r in rows if r.get("occurredAt") == d.isoformat()), 2))
+    elif period == "yearly":
+        labels = list(range(1, 13))
+        title = "消费走势（月）"
+        xlabels = [f"{m}月" for m in labels]
+        values = []
+        for m in labels:
+            values.append(round(sum((r.get("amountCny") or 0) for r in rows if dt.date.fromisoformat(r.get("occurredAt")).month == m), 2))
+    else:
+        return "", ""
+
+    width, height = 820, 260
+    left, right, top, bottom = 60, 30, 25, 45
+    inner_w = width - left - right
+    inner_h = height - top - bottom
+    vmax = max(values) if values else 0
+    vmax = vmax if vmax > 0 else 1
+
+    def px(i):
+        return left + (inner_w * i / max(1, len(values) - 1))
+
+    def py(v):
+        return top + inner_h - (v / vmax * inner_h)
+
+    pts = " ".join(f"{px(i):.1f},{py(v):.1f}" for i, v in enumerate(values))
+    svg = [
+        f"<svg class='trend-svg' viewBox='0 0 {width} {height}' width='100%' height='{height}' role='img' aria-label='{title}'>",
+        f"<line x1='{left}' y1='{top+inner_h}' x2='{width-right}' y2='{top+inner_h}' stroke='#cbd5e1' stroke-width='1'/>",
+        f"<line x1='{left}' y1='{top}' x2='{left}' y2='{top+inner_h}' stroke='#cbd5e1' stroke-width='1'/>",
+    ]
+    # simple grid
+    for j in range(5):
+        y = top + inner_h * j / 4
+        val = vmax * (4 - j) / 4
+        svg.append(f"<line x1='{left}' y1='{y:.1f}' x2='{width-right}' y2='{y:.1f}' stroke='#e5e7eb' stroke-width='1'/>")
+        svg.append(f"<text x='{left-8}' y='{y+4:.1f}' text-anchor='end' font-size='12' fill='#6b7280'>{val:.0f}</text>")
+    if values:
+        svg.append(f"<polyline points='{pts}' fill='none' stroke='#6366F1' stroke-width='2.5'/>")
+        x_font = '9' if period == 'monthly' else '11'
+        for i, v in enumerate(values):
+            x, y = px(i), py(v)
+            svg.append(f"<circle cx='{x:.1f}' cy='{y:.1f}' r='4' fill='#6366F1'/>")
+            svg.append(f"<text x='{x:.1f}' y='{top+inner_h+20}' text-anchor='middle' font-size='{x_font}' fill='#374151'>{xlabels[i]}</text>")
+            svg.append(f"<text x='{x:.1f}' y='{y-10:.1f}' text-anchor='middle' font-size='11' fill='#111827'>{v:.0f}</text>")
+    svg.append("</svg>")
+    return title, "".join(svg)
+
+
+def _build_report_html(out: dict, period_label: str, period_compare_label: str, cat_svg: str, trend_title: str, trend_svg: str, large: list) -> str:
     start = out['range']['start']
     end = out['range']['end']
     lines = [
@@ -538,7 +600,7 @@ def _build_report_html(out: dict, period_label: str, period_compare_label: str, 
         "<meta charset='utf-8'>",
         "<meta name='viewport' content='width=device-width, initial-scale=1'>",
         "<title>支出报告</title>",
-        "<style>body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',Arial,sans-serif;line-height:1.6;padding:20px;margin:0;color:#111827;background:#fafafa;display:flex;justify-content:center;} .page{width:min(980px,100%);text-align:center;} h1,h2{margin:10px 0;} p{margin:8px 0;} .cat-svg{display:block;max-width:820px;height:auto;margin:0 auto;} ul,ol{display:inline-block;text-align:left;padding-left:24px;} li{margin:4px 0;}</style>",
+        "<style>body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',Arial,sans-serif;line-height:1.6;padding:20px;margin:0;color:#111827;background:#fafafa;display:flex;justify-content:center;} .page{width:min(980px,100%);text-align:center;} h1,h2{margin:10px 0;} p{margin:8px 0;} .cat-svg,.trend-svg{display:block;max-width:820px;height:auto;margin:0 auto;} ul,ol{display:inline-block;text-align:left;padding-left:24px;} li{margin:4px 0;}</style>",
         "</head><body><div class='page'>",
         f"<h1>支出{period_label}</h1>",
         f"<p>统计区间：{start} ~ {end}</p>",
@@ -549,6 +611,8 @@ def _build_report_html(out: dict, period_label: str, period_compare_label: str, 
         f"<p style='color:#4b5563;font-size:14px;'>对比区间：{out['trendVsPrevious']['previousRange']['start']} ~ {out['trendVsPrevious']['previousRange']['end']}</p>",
         "<h2>分类占比</h2>",
         cat_svg,
+        f"<h2>{trend_title}</h2>",
+        trend_svg,
         "<h2>大额支出（>500 CNY）</h2>", "<ul>"]
     if large:
         for x in large:
@@ -628,7 +692,8 @@ def cmd_report(args):
 
     period_label, period_compare_label = _period_labels(args.period)
     cat_svg = _build_category_svg(out["byCategory"], total)
-    html = _build_report_html(out, period_label, period_compare_label, cat_svg, large)
+    trend_title, trend_svg = _build_trend_svg(args.period, rows, start, end)
+    html = _build_report_html(out, period_label, period_compare_label, cat_svg, trend_title, trend_svg, large)
     (base.with_suffix(".html")).write_text(html, encoding="utf-8")
     print(json.dumps({"json": str(base.with_suffix('.json')), "html": str(base.with_suffix('.html'))}, ensure_ascii=False))
 

@@ -4,42 +4,42 @@
 
 [简体中文文档](./README.zh-CN.md)
 
-OpenClaw skill for local-first personal expense tracking with proactive reminders, natural-language entry parsing, multi-currency support, and periodic reports.
+An OpenClaw skill for local-first personal expense tracking with proactive reminders, natural-language entry parsing, multi-currency support, and periodic reports — including visual weekly / monthly / yearly reports.
 
 ## Features
 
 - **Natural-language bookkeeping**
   - Examples: `午饭 32元`, `咖啡 USD 4.5`, `补录 3月1日 打车 45`
 - **Smarter classification UX**
-  - If an entry is uncategorized (`待分类`), the tool returns top-3 category suggestions.
-  - You can confirm + learn category mapping so similar entries auto-classify next time.
+  - If an entry is uncategorized (`待分类`), the tool returns top-3 category suggestions
+  - You can confirm + learn category mapping so similar entries auto-classify next time
 - **Safer currency parsing**
-  - Longest-token-first detection avoids mis-parsing cases like `美元` being matched as `元`.
+  - Longest-token-first detection avoids mis-parsing cases like `美元` being matched as `元`
 - **FX reliability fallback**
-  - Uses primary + backup FX APIs, and falls back to local cached rates if live fetch fails.
-  - Report output includes `fxMeta` (`updatedAt`, `source`, `stale`) for transparency.
+  - Uses primary + backup FX APIs, and falls back to local cached rates if live fetch fails
+  - Report output includes `fxMeta` (`updatedAt`, `source`, `stale`) for transparency
 - **Local storage (editable, portable)**
-  - `shared/expense-report/config.json`
-  - `shared/expense-report/entries.jsonl`
-  - `shared/expense-report/reports/`
+  - All bookkeeping data stays in local files
+- **Multi-currency support**
+  - CNY / USD / EUR / HKD / JPY / KRW / GBP / SGD
+  - Unified CNY output at report time
 - **Periodic reporting**
   - Daily / Weekly / Monthly / Yearly
-  - JSON + HTML output (PDF can be rendered from HTML)
-- **Visual report template (Weekly/Monthly/Yearly)**
-  - Unified Chinese layout for weekly, monthly, yearly reports
-  - Includes summary block, pie chart with straight leader lines, large-expense block, and Top 10 list
-  - Daily report stays text-first (no screenshot required)
-- **Multi-currency support**
-  - CNY, USD, EUR, HKD, JPY, KRW, GBP, SGD
-  - Unified CNY output at report generation time
+  - JSON + HTML output
+- **Visual reporting (weekly / monthly / yearly)**
+  - Unified Chinese visual layout
+  - Includes summary block, category pie chart, trend dot chart, large-expense block, and Top 10 list
+  - Daily report remains text-first by default (no screenshot required)
 
 ## Directory Structure
 
 ```text
-expense-report/
+skills/expense-report/
 ├── SKILL.md
 ├── scripts/
-│   └── ledger.py
+│   ├── ledger.py
+│   ├── render_visual_report.py
+│   └── capture_visual_report.py
 └── references/
     ├── category-rules.md
     └── data-contract.md
@@ -59,9 +59,18 @@ shared/expense-report/
     └── yearly/
 ```
 
-## Quick Start
+## Code Entrypoints
 
-From workspace root:
+### 1) Main bookkeeping entrypoint: `ledger.py`
+
+Handles:
+- init config
+- add entries
+- confirm category + learn keywords
+- refresh FX rates
+- generate JSON / HTML reports by period
+
+Common commands:
 
 ```bash
 python3 skills/expense-report/scripts/ledger.py init --root shared/expense-report
@@ -70,36 +79,73 @@ python3 skills/expense-report/scripts/ledger.py rates --root shared/expense-repo
 python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period daily
 ```
 
-## Visual Report (Weekly / Monthly / Yearly)
+### 2) Visual report entrypoint: `render_visual_report.py`
 
-Current visual template is unified across weekly/monthly/yearly:
+Handles:
+- calling `ledger.py report`
+- validating the expected visual title (`支出周报 / 支出月报 / 支出年报`)
+- validating chart markup exists
+- failing fast instead of continuing with a broken render
 
-- Header summary: date range, total CNY, count, period-over-period delta, comparison range
-- Category share: pie chart with external straight-line labels
-- Large expenses: `>500 CNY`
-- Top 10 expenses list
+Examples:
 
-Period comparison labels:
+```bash
+python3 skills/expense-report/scripts/render_visual_report.py --root shared/expense-report --period weekly
+python3 skills/expense-report/scripts/render_visual_report.py --root shared/expense-report --period monthly
+python3 skills/expense-report/scripts/render_visual_report.py --root shared/expense-report --period yearly
+```
 
+### 3) Capture-prep entrypoint: `capture_visual_report.py`
+
+Handles:
+- validating the target HTML title and chart markup
+- starting a local HTTP server automatically
+- returning a stable `http://127.0.0.1:<port>/...html` URL for screenshot capture
+
+Example:
+
+```bash
+python3 skills/expense-report/scripts/capture_visual_report.py \
+  --html shared/expense-report/reports/weekly/<stamp>.html \
+  --title 支出周报
+```
+
+## Report Types and Presentation
+
+### Daily report
+
+- Intended for same-day summary
+- Text-first by default
+- No visual screenshot required
+
+### Weekly / Monthly / Yearly reports
+
+These are treated as **default visual reports**, not optional enhancements.
+
+Unified template includes:
+- Header summary
+  - date range
+  - total CNY
+  - record count
+  - period-over-period delta
+  - comparison range
+- Category share
+  - pie chart
+  - external straight-line labels
+- Spending trend
+  - Weekly: daily trend
+  - Monthly: daily trend (X-axis shows day numbers only, with smaller labels)
+  - Yearly: monthly trend
+- Large expenses
+  - threshold: `>500 CNY`
+- Top 10 expense list
+
+Comparison labels:
 - Weekly: vs previous week
 - Monthly: vs previous month
 - Yearly: vs previous year
 
-Generation examples:
-
-```bash
-python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period weekly
-python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period monthly
-python3 skills/expense-report/scripts/ledger.py report --root shared/expense-report --period yearly
-```
-
-## Report Delivery (runnable)
-
-Use OpenClaw cron + scripts to:
-
-- send reminders multiple times per day,
-- generate reports at configured times,
-- deliver report files to Discord and email.
+## Report Delivery
 
 ### Email (SMTP)
 
@@ -116,7 +162,7 @@ python3 skills/expense-report/scripts/deliver_report.py \
   --to a@example.com,b@example.com
 ```
 
-Tip: run with `--dry-run` first. In dry-run mode, no delivery target is required; it will validate report-file readiness only.
+Tip: use `--dry-run` first. In dry-run mode, no delivery target is required; it only validates report-file readiness.
 
 ### Discord delivery
 
@@ -137,21 +183,47 @@ python3 skills/expense-report/scripts/deliver_report.py \
   --discord-channel-id <CHANNEL_ID>
 ```
 
-## Scheduled behavior (current)
+## Scheduled Behavior (Current)
 
-- Daily report: send daily, text summary only (no screenshot)
-- Weekly report: visual template + report path + screenshot
-- Monthly report: only on month-end; silent skip on non-month-end days
-- Yearly report: only on year-end; silent skip on non-year-end days
+- Daily report: sent daily, text summary only
+- Weekly report: every Sunday, expected to send text summary + report path + image attachment
+- Monthly report: sent only on month-end; silent skip otherwise
+- Yearly report: sent only on year-end; silent skip otherwise
+
+For weekly / monthly / yearly:
+- Never screenshot `file://...` directly
+- Always open the HTML through local HTTP first
+- If page render fails, title mismatches, chart is missing, or screenshot fails: stop with error instead of degrading to text-only delivery
+
+## Data Flow
+
+1. Init config
+   - set reminder times, summary times, categories, and delivery targets (Discord / Email)
+2. Add entries
+   - supports same-day and backfill records
+3. Clean data
+   - parse amount, currency, date, note; uncertain category becomes `待分类`
+4. FX conversion
+   - fetch rates at report time and convert to CNY
+5. Generate reports
+   - summarize totals, category share, trend, large expenses, etc.
+6. Deliver reports
+   - use OpenClaw cron + messaging to send to Discord / email
+
+## Example Inputs
+
+- `晚饭 88`
+- `地铁 4元`
+- `补录 3月1日 打车 45`
+- `昨天 咖啡 USD 4.5`
+- `买书 39 欧元`
 
 ## Notes
 
-- FX conversion happens at **report time** (not entry time).
-- If category cannot be inferred, mark as `待分类` and return top-3 suggestions.
-- Use `confirm-category --learn` to persist a keyword-category mapping for future auto-classification.
-- For destructive edits (deleting historical entries), require explicit confirmation.
-
-## Uncategorized confirmation & learning
+- Recommended to run from the `workspace-expense` root; if run elsewhere, scripts still resolve relative `--root` against the skill workspace
+- FX conversion happens at report time, not entry time
+- Require confirmation before destructive edits to historical records
+- Uncategorized entries can be confirmed and learned for future auto-classification:
 
 ```bash
 # confirm latest uncategorized entry and learn keyword from note
@@ -169,6 +241,8 @@ python3 skills/expense-report/scripts/ledger.py confirm-category \
   --keyword 宠物零食
 ```
 
+- All core data stays local for long-term portability and maintenance
+
 ## Packaging
 
 ```bash
@@ -177,19 +251,19 @@ python3 /opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/scripts/pac
   skills/dist
 ```
 
-Output: `skills/dist/expense-report.skill`
+Output:
+- `skills/dist/expense-report.skill`
 
+## Version Notes
 
-## v1.0.2 patch highlights
+### v1.0.2
+- Friendly validation message when amount is missing (no traceback)
+- Correct decimal parsing for inputs like `.5` (now parsed as `0.5`)
+- Refund semantics: `退款/报销/返现/退货` or negative amounts are classified as `退款与冲减`
+- Minor note-cleaning fix for decimal-format inputs
 
-- Friendly validation message when amount is missing (no traceback).
-- Correct decimal parsing for inputs like `.5` (now parsed as `0.5`).
-- Refund semantics: `退款/报销/返现/退货` or negative amounts are classified as `退款与冲减`.
-- Minor note-cleaning fix for decimal-format inputs.
-
-## v1.0.1 patch highlights
-
-- Added Discord delivery in `deliver_report.py` (webhook or bot token + channel id).
-- Added category validation in `confirm-category` (rejects invalid categories).
-- Hardened `$` (USD symbol) parsing logic to avoid boundary pitfalls.
-- Added `report --date YYYY-MM-DD` for historical settlement/report generation.
+### v1.0.1
+- Added Discord delivery in `deliver_report.py` (webhook or bot token + channel id)
+- Added category validation in `confirm-category` (rejects invalid categories)
+- Hardened `$` (USD symbol) parsing logic to avoid boundary pitfalls
+- Added `report --date YYYY-MM-DD` for historical settlement/report generation
